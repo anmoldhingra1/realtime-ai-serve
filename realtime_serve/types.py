@@ -25,7 +25,7 @@ class InferenceRequest:
     timeout: float = 30.0
     client_id: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self) -> None:
         """Validate request parameters."""
         if self.max_tokens <= 0:
@@ -63,7 +63,7 @@ class BatchConfig:
     max_wait_ms: int = 50
     min_batch_size: int = 1
     dynamic_batching: bool = True
-    
+
     def __post_init__(self) -> None:
         """Validate batch configuration."""
         if self.max_batch_size <= 0:
@@ -86,7 +86,7 @@ class ModelConfig:
     max_seq_length: int = 2048
     warmup_tokens: int = 100
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self) -> None:
         """Validate model configuration."""
         if not self.name:
@@ -108,7 +108,7 @@ class ServerConfig:
     log_level: str = "INFO"
     rate_limit_per_minute: int = 10000
     graceful_shutdown_timeout: float = 30.0
-    
+
     def __post_init__(self) -> None:
         """Validate server configuration."""
         if self.port <= 0 or self.port > 65535:

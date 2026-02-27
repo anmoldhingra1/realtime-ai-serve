@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Any
 
 from realtime_serve import (
     InferenceServer,
@@ -22,21 +21,21 @@ logger = logging.getLogger(__name__)
 
 class MockLanguageModel:
     """Mock language model for demonstration.
-    
+
     Generates tokens by splitting the prompt into words and returning
     them incrementally. Useful for testing streaming infrastructure.
     """
-    
+
     def __init__(self, config: ModelConfig):
         """Initialize mock model.
-        
+
         Args:
             config: Model configuration
         """
         self.config = config
         self.vocab_size = 50000
         logger.info(f"Initialized MockLanguageModel: {config.name}")
-    
+
     async def generate(
         self,
         prompt: str,
@@ -44,12 +43,12 @@ class MockLanguageModel:
         temperature: float = 1.0,
     ) -> list:
         """Generate tokens.
-        
+
         Args:
             prompt: Input prompt
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
-            
+
         Returns:
             List of tokens
         """
@@ -59,12 +58,12 @@ class MockLanguageModel:
             "lazy", "dog", "and", "continues", "on", "its", "way",
             "through", "the", "forest", "at", "a", "steady", "pace",
         ]
-        
+
         tokens = []
         for i, word in enumerate(words[:max_tokens]):
             # Simulate some processing delay (would be actual GPU time)
             await asyncio.sleep(0.01)
-            
+
             # Create token
             token = StreamToken(
                 token=word,
@@ -73,16 +72,16 @@ class MockLanguageModel:
                 is_special=False,
             )
             tokens.append(token)
-        
+
         return tokens
 
 
 async def create_model_loader(config: ModelConfig) -> MockLanguageModel:
     """Factory function to create a mock model.
-    
+
     Args:
         config: Model configuration
-        
+
     Returns:
         Model instance
     """
@@ -91,7 +90,7 @@ async def create_model_loader(config: ModelConfig) -> MockLanguageModel:
 
 async def main() -> None:
     """Run example server."""
-    
+
     # Create server configuration
     server_config = ServerConfig(
         host="127.0.0.1",
@@ -104,10 +103,10 @@ async def main() -> None:
         log_level="INFO",
         rate_limit_per_minute=10000,
     )
-    
+
     # Create server
     server = InferenceServer(config=server_config)
-    
+
     # Register model with loader
     model_config = ModelConfig(
         name="gpt2",
@@ -116,11 +115,11 @@ async def main() -> None:
         warmup_tokens=50,
     )
     server.register_model(model_config, loader=create_model_loader)
-    
+
     logger.info("Starting inference server...")
     logger.info("Visit http://127.0.0.1:8000/health to check server status")
     logger.info("POST to http://127.0.0.1:8000/infer to make requests")
-    
+
     try:
         await server.start(host=server_config.host, port=server_config.port)
     except KeyboardInterrupt:
