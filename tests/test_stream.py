@@ -1,6 +1,5 @@
 """Tests for StreamManager."""
 
-import asyncio
 import pytest
 
 from realtime_serve.stream import StreamManager
