@@ -1,6 +1,5 @@
 """Tests for middleware components."""
 
-import asyncio
 import pytest
 
 from realtime_serve.middleware import RateLimiter
