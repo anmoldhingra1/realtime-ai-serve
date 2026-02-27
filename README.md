@@ -1,131 +1,148 @@
-\![CI](https://github.com/anmoldhingra1/realtime-ai-serve/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/anmoldhingra1/realtime-ai-serve/actions/workflows/ci.yml/badge.svg)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 # realtime-ai-serve
 
-A low-latency streaming inference server for AI models built for real-time interactive experiences. Handles token streaming, request batching, dynamic model hot-swapping, and robust connection management for production AI deployments.
+A low-latency streaming inference server for AI models. Handles token streaming, request batching, dynamic model hot-swapping, and connection management for production deployments.
 
-## Installation
+Built on asyncio and aiohttp — no heavy frameworks, just fast async I/O.
+
+## Install
 
 ```bash
 pip install realtime-ai-serve
 ```
 
-For development:
-
-```bash
-git clone https://github.com/anmol-dhingra/realtime-ai-serve.git
-cd realtime-ai-serve
-pip install -e ".[dev]"
-```
-
 ## Quick Start
 
-### Server Setup
-
 ```python
+import asyncio
 from realtime_serve import InferenceServer, ModelConfig
 
-# Create and configure server
 server = InferenceServer(
     max_connections=256,
     request_timeout=30.0,
     max_batch_size=32,
-    max_batch_wait_ms=50
 )
 
-# Register a model
-model_config = ModelConfig(
+server.register_model(ModelConfig(
     name="gpt2",
     version="1.0.0",
-    model_path="/path/to/model",
-    device="cuda"
-)
-server.register_model(model_config)
+    model_path="/models/gpt2",
+    device="cuda",
+))
 
-# Start the server
-import asyncio
 asyncio.run(server.start(host="0.0.0.0", port=8000))
 ```
 
 ### Streaming Client
 
 ```python
-import asyncio
-import aiohttp
+import aiohttp, asyncio
 
-async def stream_inference():
+async def stream():
     async with aiohttp.ClientSession() as session:
-        payload = {
+        async with session.post("http://localhost:8000/infer", json={
             "model": "gpt2",
             "prompt": "Once upon a time",
-            "max_tokens": 100
-        }
-        
-        async with session.post(
-            "http://localhost:8000/infer",
-            json=payload
-        ) as resp:
+            "max_tokens": 100,
+        }) as resp:
             async for line in resp.content:
-                token = line.decode().strip()
-                if token:
-                    print(token, end="", flush=True)
+                print(line.decode().strip(), end="", flush=True)
 
-asyncio.run(stream_inference())
+asyncio.run(stream())
 ```
 
-## Core Components
+## Features
 
-### InferenceServer
-The main HTTP server handling incoming inference requests. Manages connections, routes requests to batch queues, and streams responses back to clients. Features graceful shutdown with connection draining and configurable connection limits.
+**Token streaming** — Responses stream token-by-token via server-sent events. StreamManager handles backpressure, buffering, and timeouts per connection.
 
-### StreamManager
-Manages individual output streams for clients. Handles incremental token delivery via async generators, implements backpressure when clients are slow, and manages stream timeouts and cleanup.
-
-### BatchScheduler
-Collects incoming requests into efficient batches for GPU processing. Dynamically sizes batches based on queue length and latency constraints. Supports priority queues for urgent requests and configurable batch parameters.
-
-### ModelRegistry
-Manages model lifecycle including registration, unregistration, and health monitoring. Supports hot-swapping: loading new model versions while old versions continue serving traffic. Includes warm-up inference on model load.
-
-## Architecture
-
-The server operates as an async coroutine-based system:
-
-1. **Request Intake**: HTTP endpoints accept inference requests with streaming headers.
-2. **Batch Collection**: BatchScheduler groups requests by target model, optimizing GPU throughput.
-3. **Model Inference**: Requests are processed through registered models on available devices.
-4. **Token Streaming**: StreamManager delivers tokens to clients via server-sent events as they're generated.
-5. **Connection Management**: InferenceServer tracks active connections, enforces limits, and handles graceful degradation.
-
-Middleware layers handle rate limiting, structured logging, and metrics collection.
-
-## Configuration
-
-Configure via environment variables or constructor arguments:
+**Request batching** — BatchScheduler groups requests by model for GPU-efficient processing. Dynamic batch sizing adapts to load. Priority queues ensure urgent requests aren't starved.
 
 ```python
-server = InferenceServer(
-    max_connections=256,        # Maximum concurrent connections
-    request_timeout=30.0,       # Request timeout in seconds
-    max_batch_size=32,          # Maximum requests per batch
-    max_batch_wait_ms=50,       # Max wait before processing small batch
-    enable_metrics=True,        # Enable prometheus metrics
-    log_level="INFO",           # Logging level
-    rate_limit_per_minute=1000  # Client rate limit
+from realtime_serve import BatchConfig
+
+config = BatchConfig(
+    max_batch_size=32,    # max requests per batch
+    max_wait_ms=50,       # max wait before flushing a partial batch
+    dynamic_batching=True,
 )
 ```
 
-ModelConfig accepts device placement, quantization, and warm-up parameters.
+**Model hot-swap** — Load new model versions while old ones continue serving. ModelRegistry manages versioning, health checks, and warm-up inference.
 
-## Performance Notes
+```python
+# Register a loader, then load versions independently
+server.model_registry.register_loader("gpt2", load_gpt2)
+await server.model_registry.load_model(ModelConfig(name="gpt2", version="2.0"))
+```
 
-- Latency: p50 ~15ms, p95 ~45ms, p99 ~120ms (on A100 with batch size 32)
-- Throughput: ~8,000 tokens/sec (with aggressive batching)
-- Memory: ~2GB per model on GPU, shared across connections
-- Connection overhead: ~1ms per connection setup
+**Middleware** — Pluggable middleware chain with built-in rate limiting (token bucket), structured request logging, and metrics collection.
 
-Tune batch_size and batch_wait_ms based on your latency SLA. Smaller batches reduce latency; larger batches improve throughput.
+```python
+from realtime_serve import RateLimiter
+
+limiter = RateLimiter(tokens_per_minute=1000)
+allowed = await limiter.check_rate_limit("client_42")
+```
+
+**Typed configuration** — All configs are dataclasses with validation. Invalid values raise immediately, not at runtime.
+
+```python
+from realtime_serve import ServerConfig
+
+config = ServerConfig(
+    port=8000,
+    max_connections=256,
+    request_timeout=30.0,
+    rate_limit_per_minute=10000,
+    graceful_shutdown_timeout=30.0,
+)
+```
+
+## Architecture
+
+```
+Client ──HTTP──▶ InferenceServer ──▶ MiddlewareChain
+                      │                    │
+                      ▼                    ▼
+               BatchScheduler       RateLimiter
+              (priority queues)     RequestLogger
+                      │             MetricsCollector
+                      ▼
+               ModelRegistry ──▶ Model (versioned)
+                      │
+                      ▼
+               StreamManager ──SSE──▶ Client
+              (per-connection buffer)
+```
+
+All I/O is async. No threads needed for the serving path.
+
+## Performance
+
+Benchmarked on A100 with batch size 32:
+
+| Metric | Value |
+|--------|-------|
+| p50 latency | ~15ms |
+| p95 latency | ~45ms |
+| p99 latency | ~120ms |
+| Throughput | ~8,000 tok/s |
+| Memory per model | ~2GB GPU |
+
+Tune `max_batch_size` and `max_batch_wait_ms` based on your latency SLA.
+
+## Testing
+
+```bash
+pip install -e ".[dev]"
+pytest tests/ -v
+```
+
+46 tests covering types, batching, streaming, models, and middleware.
 
 ## License
 
-MIT License - Copyright 2024 Anmol Dhingra
+MIT
