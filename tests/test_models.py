@@ -1,7 +1,6 @@
 """Tests for Model and ModelRegistry."""
 
 import time
-import pytest
 
 from realtime_serve.models import Model, ModelRegistry
 from realtime_serve.types import ModelConfig
