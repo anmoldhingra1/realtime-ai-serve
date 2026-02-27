@@ -1,6 +1,5 @@
 """Tests for BatchScheduler."""
 
-import asyncio
 import pytest
 
 from realtime_serve.batch import BatchScheduler
