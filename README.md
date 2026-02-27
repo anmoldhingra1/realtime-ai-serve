@@ -1,3 +1,5 @@
+\![CI](https://github.com/anmoldhingra1/realtime-ai-serve/actions/workflows/ci.yml/badge.svg)
+
 # realtime-ai-serve
 
 A low-latency streaming inference server for AI models built for real-time interactive experiences. Handles token streaming, request batching, dynamic model hot-swapping, and robust connection management for production AI deployments.
