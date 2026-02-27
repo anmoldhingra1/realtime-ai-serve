@@ -50,6 +50,8 @@ Issues = "https://github.com/anmoldhingra1/realtime-ai-serve/issues"
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = ["E", "F", "W"]
 
 [tool.pytest.ini_options]
