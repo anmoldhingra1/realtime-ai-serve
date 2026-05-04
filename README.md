@@ -4,14 +4,30 @@
 
 # realtime-ai-serve
 
-A low-latency streaming inference server for AI models. Handles token streaming, request batching, dynamic model hot-swapping, and connection management for production deployments.
+A compact streaming inference server for real-time AI applications. Handles token streaming, request batching, dynamic model hot-swapping, and connection management for latency-sensitive deployments.
 
 Built on asyncio and aiohttp — no heavy frameworks, just fast async I/O.
 
-## Install
+## Why This Exists
+
+Real-time AI products need more than a model endpoint. They need backpressure, streaming, batching, graceful shutdown, model versioning, and predictable behavior under load.
+
+This repo is a small public slice of that runtime thinking. It maps directly to the kind of latency and reliability work behind voiced AI experiences: a host cannot feel alive if the serving path blocks, stalls, or loses stream state.
+
+## What It Shows
+
+- Server-sent event style token streaming
+- Async request batching and priority queues
+- Model registry with versioned hot swaps
+- Middleware for rate limiting, logging, and metrics
+- Clean typed configuration for runtime behavior
+
+## Install Locally
 
 ```bash
-pip install realtime-ai-serve
+git clone https://github.com/anmoldhingra1/realtime-ai-serve.git
+cd realtime-ai-serve
+pip install -e ".[dev]"
 ```
 
 ## Quick Start
@@ -120,19 +136,11 @@ Client ──HTTP──▶ InferenceServer ──▶ MiddlewareChain
 
 All I/O is async. No threads needed for the serving path.
 
-## Performance
+## Performance Notes
 
-Benchmarked on A100 with batch size 32:
+The repo includes the serving primitives needed to benchmark latency and throughput under your own model/runtime setup. The exact numbers depend on model size, hardware, batching window, tokenizer, and stream transport.
 
-| Metric | Value |
-|--------|-------|
-| p50 latency | ~15ms |
-| p95 latency | ~45ms |
-| p99 latency | ~120ms |
-| Throughput | ~8,000 tok/s |
-| Memory per model | ~2GB GPU |
-
-Tune `max_batch_size` and `max_batch_wait_ms` based on your latency SLA.
+Tune `max_batch_size`, `max_batch_wait_ms`, and connection limits based on your latency SLA.
 
 ## Testing
 
